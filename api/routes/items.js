@@ -3,6 +3,12 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const Item = require('../models/item');
 const checkToken = require('../middleware/checkToken');
+const fs = require('fs')
+const path = require('path')
+const crypto = require('crypto');
+const buffer = require('buffer');
+
+const privateKey = fs.readFileSync(path.join(__dirname, 'keys', 'rsa.key'), 'utf8');
 
 router.get('/', checkToken, (req, res, next) => {
     Item.find().select("_id name").exec().then(docs => {
@@ -42,7 +48,11 @@ router.get('/:itemID', checkToken, (req, res, next) => {
     Item.findById(id).exec().then(doc => {
         console.log(doc);
         if (doc) {
-            res.status(200).json(doc);
+            const nonce = Buffer.from(req.body.nonce);
+            const signature = crypto.sign("SHA256", nonce , privateKey);
+            const isVerified = crypto.verify("SHA256", nonce, req.body.publicKey, signature);
+            if(isVerified) {
+                res.status(200).json(doc);}
         } else {
             res.status(404).json({
                 message: 'No item with that ID'
